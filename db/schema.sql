@@ -61,3 +61,64 @@ COMMENT ON COLUMN elections.area_code IS '
 - 00-00: 比例代表(全国)
 ';
 
+-- ============================================
+-- 公開データ（Ledger から同期）
+-- ============================================
+
+-- 公開用台帳（1年分の収支報告）
+CREATE TABLE IF NOT EXISTS public_ledgers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    politician_id UUID NOT NULL REFERENCES politicians(id),
+    organization_id UUID REFERENCES organizations(id),
+    election_id VARCHAR(50) REFERENCES elections(id),
+    fiscal_year INTEGER NOT NULL,
+    -- 集計データ
+    total_income INTEGER DEFAULT 0,
+    total_expense INTEGER DEFAULT 0,
+    journal_count INTEGER DEFAULT 0,
+    -- 同期メタデータ
+    ledger_source_id UUID NOT NULL,          -- Ledger 側の ledger.id
+    last_updated_at TIMESTAMPTZ NOT NULL,    -- 最終更新日時（Polimoney 表示用）
+    first_synced_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    -- ユニーク制約
+    UNIQUE (ledger_source_id)
+);
+
+-- 公開用仕訳
+CREATE TABLE IF NOT EXISTS public_journals (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ledger_id UUID NOT NULL REFERENCES public_ledgers(id),
+    journal_source_id UUID NOT NULL,         -- Ledger 側の journal.id
+    date DATE NOT NULL,
+    description TEXT,
+    amount INTEGER NOT NULL,
+    -- 匿名化済みデータ
+    contact_name TEXT,                        -- "非公開" or 実名
+    contact_type VARCHAR(20),                 -- 'person' or 'corporation'
+    account_code VARCHAR(50),
+    -- 改ざん検知用
+    content_hash VARCHAR(64) NOT NULL,
+    synced_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    -- ユニーク制約
+    UNIQUE (journal_source_id)
+);
+
+-- 台帳レベルの変更ログ（軽量）
+CREATE TABLE IF NOT EXISTS ledger_change_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ledger_id UUID NOT NULL REFERENCES public_ledgers(id),
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_summary TEXT NOT NULL,             -- "仕訳3件を追加", "仕訳を修正" 等
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- インデックス（公開データ用）
+CREATE INDEX IF NOT EXISTS idx_public_ledgers_politician ON public_ledgers(politician_id);
+CREATE INDEX IF NOT EXISTS idx_public_ledgers_fiscal_year ON public_ledgers(fiscal_year);
+CREATE INDEX IF NOT EXISTS idx_public_journals_ledger ON public_journals(ledger_id);
+CREATE INDEX IF NOT EXISTS idx_public_journals_date ON public_journals(date);
+CREATE INDEX IF NOT EXISTS idx_change_logs_ledger ON ledger_change_logs(ledger_id);
+CREATE INDEX IF NOT EXISTS idx_change_logs_changed_at ON ledger_change_logs(changed_at DESC);
+

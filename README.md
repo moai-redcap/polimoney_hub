@@ -24,12 +24,12 @@ Polimoney エコシステムの中核となるデータハブサービス。
 
 ## 技術スタック
 
-| 項目 | 技術 |
-|------|------|
-| ランタイム | Deno |
-| フレームワーク | Hono |
-| データベース | Azure PostgreSQL |
-| ホスティング | Deno Deploy |
+| 項目           | 技術             |
+| -------------- | ---------------- |
+| ランタイム     | Deno             |
+| フレームワーク | Hono             |
+| データベース   | Azure PostgreSQL |
+| ホスティング   | Deno Deploy      |
 
 ## クイックスタート
 
@@ -47,12 +47,12 @@ deno task dev
 
 ## API 概要
 
-| エンドポイント | 説明 |
-|----------------|------|
-| `GET /health` | ヘルスチェック |
-| `/api/v1/politicians` | 政治家 CRUD |
-| `/api/v1/organizations` | 政治団体 CRUD |
-| `/api/v1/elections` | 選挙 CRUD |
+| エンドポイント          | 説明           |
+| ----------------------- | -------------- |
+| `GET /health`           | ヘルスチェック |
+| `/api/v1/politicians`   | 政治家 CRUD    |
+| `/api/v1/organizations` | 政治団体 CRUD  |
+| `/api/v1/elections`     | 選挙 CRUD      |
 
 詳細: [docs/API.md](docs/API.md)
 
@@ -68,17 +68,17 @@ curl -H "X-API-Key: your-api-key" \
 
 ## ドキュメント
 
-| ドキュメント | 内容 |
-|--------------|------|
-| [docs/API.md](docs/API.md) | API 詳細仕様 |
+| ドキュメント                                 | 内容               |
+| -------------------------------------------- | ------------------ |
+| [docs/API.md](docs/API.md)                   | API 詳細仕様       |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | アーキテクチャ設計 |
 
 ## 関連リポジトリ
 
-| リポジトリ | 説明 |
-|------------|------|
+| リポジトリ                                                          | 説明                   |
+| ------------------------------------------------------------------- | ---------------------- |
 | [polimoney_ledger](https://github.com/moai-redcap/polimoney_ledger) | 政治資金収支管理アプリ |
-| [polimoney](https://github.com/digitaldemocracy2030/polimoney) | 政治資金可視化サービス |
+| [polimoney](https://github.com/digitaldemocracy2030/polimoney)      | 政治資金可視化サービス |
 
 ## ライセンス
 

@@ -193,6 +193,111 @@ polimoney_hub/
 
 ---
 
+## 公開データの永続化
+
+### 設計方針
+
+Polimoney がデータを取得する際、毎回 Ledger DB (Supabase) にクエリするのは非効率です。
+そのため、Hub (Azure DB) に**公開用データを永続保存**し、Ledger DB への負荷をゼロにします。
+
+### データフロー
+
+```
+┌─────────────────┐
+│ Ledger DB       │ ← 政治家のみアクセス（プライベート）
+│ (Supabase)      │
+└────────┬────────┘
+         │ Realtime (変更時のみ)
+         ▼
+┌─────────────────┐
+│ Hub             │
+│ - 匿名化        │
+│ - ハッシュ生成  │
+│ - 変更検知      │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Azure DB        │ ← 公開データの永続保存
+│ - public_ledgers│    Ledger DB への負荷ゼロ
+│ - public_journals│
+│ - change_logs   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Polimoney       │ ← Hub (Azure DB) からのみ取得
+└─────────────────┘
+```
+
+---
+
+## 変更履歴と透明性
+
+### 課題
+
+政治家が過去の台帳をこっそり変更しても誰も気づけない → 不健全
+
+### 解決策: ハッシュ + 台帳レベルの変更ログ
+
+1. 仕訳登録時に**ハッシュ**を生成・保存（改ざん検知用）
+2. **台帳レベル**で変更ログを保存（仕訳ごとだと多すぎる）
+3. Polimoney で「最終更新日時」と「変更履歴」を表示
+
+### スキーマ
+
+```sql
+-- 公開用台帳（1年分の収支報告）
+CREATE TABLE public_ledgers (
+    id UUID PRIMARY KEY,
+    politician_id UUID NOT NULL REFERENCES politicians(id),
+    election_id VARCHAR(50) REFERENCES elections(id),
+    fiscal_year INTEGER NOT NULL,
+    total_income INTEGER DEFAULT 0,
+    total_expense INTEGER DEFAULT 0,
+    journal_count INTEGER DEFAULT 0,
+    last_updated_at TIMESTAMPTZ NOT NULL,
+    first_synced_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 公開用仕訳
+CREATE TABLE public_journals (
+    id UUID PRIMARY KEY,
+    ledger_id UUID NOT NULL REFERENCES public_ledgers(id),
+    date DATE NOT NULL,
+    description TEXT,
+    amount INTEGER NOT NULL,
+    contact_name TEXT,
+    contact_type VARCHAR(20),
+    content_hash VARCHAR(64) NOT NULL,
+    synced_at TIMESTAMPTZ NOT NULL
+);
+
+-- 台帳レベルの変更ログ
+CREATE TABLE ledger_change_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ledger_id UUID REFERENCES public_ledgers(id),
+    changed_at TIMESTAMPTZ NOT NULL,
+    change_summary TEXT  -- "仕訳3件を追加", "仕訳を修正" 等
+);
+```
+
+### Polimoney での表示
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 山田太郎 - 2024年度 収支報告書                              │
+│                                                              │
+│ 最終更新: 2024/03/01 10:30  📋 変更履歴                     │
+├─────────────────────────────────────────────────────────────┤
+│  [収入ビュー] [支出ビュー] [科目別] [月別推移]              │
+│  ...                                                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 今後の拡張
 
 ### Phase 1: 基盤構築 ✅
@@ -200,17 +305,22 @@ polimoney_hub/
 - [x] API Key 認証
 - [x] Azure DB 接続
 
-### Phase 2: Ledger 連携
+### Phase 2: 公開データ永続化
+- [ ] public_ledgers / public_journals テーブル作成
+- [ ] ledger_change_logs テーブル作成
+- [ ] ハッシュ生成ロジック実装
+
+### Phase 3: Ledger 連携
 - [ ] Supabase Realtime 受信エンドポイント
 - [ ] 匿名化処理ロジック
 - [ ] Ledger ↔ Hub API 連携
 
-### Phase 3: Polimoney 連携
-- [ ] 仕訳データ統合 API
-- [ ] キャッシュ層 (Redis)
+### Phase 4: Polimoney 連携
+- [ ] 公開台帳 API (`/api/v1/public-ledgers`)
+- [ ] 変更履歴 API (`/api/v1/ledgers/:id/changes`)
 - [ ] 監査ログ
 
-### Phase 4: 拡張
+### Phase 5: 拡張
 - [ ] 市民向けアプリ対応
 - [ ] 研究者向け API
 - [ ] OpenAPI / Swagger ドキュメント
