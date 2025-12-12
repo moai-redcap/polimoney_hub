@@ -119,21 +119,30 @@ CREATE TABLE IF NOT EXISTS ledger_change_logs (
     --     { "id": "uuid", "date": "2024-02-20", "description": "事務所賃料", "amount": 80000 }
     --   ],
     --   "modified": [
-    --     { "id": "uuid", "date": "2024-01-15", "description": "ポスター印刷", "field": "amount" }
+    --     {
+    --       "id": "uuid",
+    --       "date": "2024-01-15",
+    --       "description": "ポスター印刷",
+    --       "changes": {
+    --         "amount": { "before": 50000, "after": 30000 },
+    --         "description": { "before": "ポスター印刷", "after": "チラシ印刷" }
+    --       }
+    --     }
     --   ],
     --   "deleted": [
-    --     { "id": "uuid", "date": "2024-01-10", "description": "削除された仕訳" }
+    --     { "id": "uuid", "date": "2024-01-10", "description": "削除された仕訳", "amount": 10000 }
     --   ]
     -- }
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 COMMENT ON COLUMN ledger_change_logs.change_details IS '
-変更詳細を JSONB で保存。
+変更詳細を JSONB で保存。透明性のため重要フィールドの差分を保持。
+
 - added: 追加された仕訳のスナップショット
-- modified: 修正された仕訳のID + どのフィールドが変更されたか
-- deleted: 削除された仕訳のスナップショット（削除前の状態を保存）
-差分（before/after）は保存しない（コスト削減）。
+- modified: 修正された仕訳 + changes で差分を保存
+  - 差分保存フィールド: amount, description, contact_name, date
+- deleted: 削除された仕訳のスナップショット（削除前の状態）
 ';
 
 -- インデックス（公開データ用）
