@@ -105,14 +105,36 @@ CREATE TABLE IF NOT EXISTS public_journals (
     UNIQUE (journal_source_id)
 );
 
--- 台帳レベルの変更ログ（軽量）
+-- 台帳レベルの変更ログ
 CREATE TABLE IF NOT EXISTS ledger_change_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     ledger_id UUID NOT NULL REFERENCES public_ledgers(id),
     changed_at TIMESTAMPTZ NOT NULL,
     change_summary TEXT NOT NULL,             -- "仕訳3件を追加", "仕訳を修正" 等
+    -- 変更詳細（JSONB で保存、クリックで展開表示用）
+    change_details JSONB,
+    -- change_details の形式:
+    -- {
+    --   "added": [
+    --     { "id": "uuid", "date": "2024-02-20", "description": "事務所賃料", "amount": 80000 }
+    --   ],
+    --   "modified": [
+    --     { "id": "uuid", "date": "2024-01-15", "description": "ポスター印刷", "field": "amount" }
+    --   ],
+    --   "deleted": [
+    --     { "id": "uuid", "date": "2024-01-10", "description": "削除された仕訳" }
+    --   ]
+    -- }
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+COMMENT ON COLUMN ledger_change_logs.change_details IS '
+変更詳細を JSONB で保存。
+- added: 追加された仕訳のスナップショット
+- modified: 修正された仕訳のID + どのフィールドが変更されたか
+- deleted: 削除された仕訳のスナップショット（削除前の状態を保存）
+差分（before/after）は保存しない（コスト削減）。
+';
 
 -- インデックス（公開データ用）
 CREATE INDEX IF NOT EXISTS idx_public_ledgers_politician ON public_ledgers(politician_id);
