@@ -1,0 +1,15 @@
+# Polimoney Hub 環境変数
+# このファイルを .env にコピーして使用してください
+
+# 実行環境
+DENO_ENV=development
+
+# サーバー設定
+PORT=8000
+
+# Azure PostgreSQL 接続
+DATABASE_URL=postgres://user:password@your-server.postgres.database.azure.com:5432/polimoney_hub?sslmode=require
+
+# API Key (サービス間認証)
+API_KEY=your-secure-api-key-here
+
