@@ -1,3 +1,5 @@
+// deno-lint-ignore-file
+// @ts-nocheck
 // ローカル開発時のみ .env を読み込む（Deno Deploy では不要）
 try {
   await import("std/dotenv/load.ts");

@@ -17,7 +17,9 @@ export async function apiKeyAuth(c: Context, next: Next) {
   ].filter(Boolean);
 
   if (validKeys.length === 0) {
-    console.warn("Warning: API_KEY_PROD/API_KEY_DEV environment variables are not set");
+    console.warn(
+      "Warning: API_KEY_PROD/API_KEY_DEV environment variables are not set"
+    );
     // 開発環境では警告のみで通過
     if (Deno.env.get("DENO_ENV") === "development") {
       await next();
@@ -43,4 +45,3 @@ export async function apiKeyAuth(c: Context, next: Next) {
 
   await next();
 }
-
