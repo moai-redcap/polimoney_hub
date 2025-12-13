@@ -75,4 +75,3 @@ const port = parseInt(Deno.env.get("PORT") || "8000");
 console.log(`🚀 Polimoney Hub is running on http://localhost:${port}`);
 
 Deno.serve({ port }, app.fetch);
-
