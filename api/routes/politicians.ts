@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { query, queryOne, execute } from "../db/client.ts";
+import { query, queryOne } from "../db/client.ts";
+import { createTableHelper } from "../db/schema.ts";
 
 export const politiciansRouter = new Hono();
 
@@ -13,8 +14,11 @@ interface Politician {
 
 // 政治家一覧取得
 politiciansRouter.get("/", async (c) => {
+  const apiKey = c.req.header("X-API-Key");
+  const tables = createTableHelper(apiKey);
+
   const politicians = await query<Politician>(
-    "SELECT * FROM politicians ORDER BY created_at DESC"
+    `SELECT * FROM ${tables.politicians} ORDER BY created_at DESC`
   );
   return c.json({ data: politicians });
 });
@@ -22,9 +26,12 @@ politiciansRouter.get("/", async (c) => {
 // 政治家取得
 politiciansRouter.get("/:id", async (c) => {
   const id = c.req.param("id");
+  const apiKey = c.req.header("X-API-Key");
+  const tables = createTableHelper(apiKey);
+
   const politician = await queryOne<Politician>(
-    "SELECT * FROM politicians WHERE id = $1",
-    [id]
+    `SELECT * FROM ${tables.politicians} WHERE id = @id`,
+    { id }
   );
 
   if (!politician) {
@@ -37,16 +44,18 @@ politiciansRouter.get("/:id", async (c) => {
 // 政治家 ID 発行
 politiciansRouter.post("/", async (c) => {
   const body = await c.req.json<{ name: string; name_kana?: string }>();
+  const apiKey = c.req.header("X-API-Key");
+  const tables = createTableHelper(apiKey);
 
   if (!body.name) {
     return c.json({ error: "name is required" }, 400);
   }
 
   const result = await query<Politician>(
-    `INSERT INTO politicians (name, name_kana) 
-     VALUES ($1, $2) 
-     RETURNING *`,
-    [body.name, body.name_kana || null]
+    `INSERT INTO ${tables.politicians} (name, name_kana) 
+     OUTPUT INSERTED.*
+     VALUES (@name, @name_kana)`,
+    { name: body.name, name_kana: body.name_kana || null }
   );
 
   return c.json({ data: result[0] }, 201);
@@ -56,15 +65,17 @@ politiciansRouter.post("/", async (c) => {
 politiciansRouter.put("/:id", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json<{ name?: string; name_kana?: string }>();
+  const apiKey = c.req.header("X-API-Key");
+  const tables = createTableHelper(apiKey);
 
   const result = await query<Politician>(
-    `UPDATE politicians 
-     SET name = COALESCE($2, name),
-         name_kana = COALESCE($3, name_kana),
-         updated_at = NOW()
-     WHERE id = $1
-     RETURNING *`,
-    [id, body.name, body.name_kana]
+    `UPDATE ${tables.politicians} 
+     SET name = COALESCE(@name, name),
+         name_kana = COALESCE(@name_kana, name_kana),
+         updated_at = GETUTCDATE()
+     OUTPUT INSERTED.*
+     WHERE id = @id`,
+    { id, name: body.name || null, name_kana: body.name_kana || null }
   );
 
   if (result.length === 0) {
@@ -73,4 +84,3 @@ politiciansRouter.put("/:id", async (c) => {
 
   return c.json({ data: result[0] });
 });
-
