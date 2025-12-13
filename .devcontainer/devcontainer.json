@@ -3,9 +3,6 @@
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspace",
-  "features": {
-    "ghcr.io/devcontainers/features/git:1": {}
-  },
   "customizations": {
     "vscode": {
       "extensions": [
@@ -26,12 +23,6 @@
     }
   },
   "forwardPorts": [8000, 5432],
-  "postCreateCommand": "deno cache src/index.ts",
-  "remoteEnv": {
-    "DENO_ENV": "development",
-    "PORT": "8000",
-    "DATABASE_URL": "postgres://postgres:postgres@db:5432/polimoney_hub",
-    "API_KEY": "dev-api-key-12345"
-  }
+  "postCreateCommand": "deno cache src/index.ts || true"
 }
 

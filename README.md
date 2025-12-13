@@ -45,6 +45,7 @@ VS Code / Cursor で開き、「Reopen in Container」を選択するだけ！
 ```
 
 **含まれるもの:**
+
 - Deno ランタイム
 - PostgreSQL（スキーマ自動適用）
 - VS Code 拡張機能（Deno, PostgreSQL）

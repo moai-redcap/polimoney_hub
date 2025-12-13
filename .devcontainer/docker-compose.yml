@@ -1,15 +1,15 @@
-version: '3.8'
-
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: denoland/deno:2.1.4
     volumes:
       - ..:/workspace:cached
+    working_dir: /workspace
     command: sleep infinity
-    networks:
-      - polimoney-network
+    environment:
+      DENO_ENV: development
+      PORT: "8000"
+      DATABASE_URL: postgres://postgres:postgres@db:5432/polimoney_hub
+      API_KEY: dev-api-key-12345
     depends_on:
       db:
         condition: service_healthy
@@ -26,16 +26,11 @@ services:
       - ../db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     ports:
       - "5432:5432"
-    networks:
-      - polimoney-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d polimoney_hub"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-networks:
-  polimoney-network:
 
 volumes:
   postgres-data:
