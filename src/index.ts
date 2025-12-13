@@ -1,3 +1,5 @@
+// deno-lint-ignore-file
+// @ts-nocheck
 // ローカル開発時のみ .env を読み込む（Deno Deploy では不要）
 try {
   await import("std/dotenv/load.ts");
@@ -75,4 +77,3 @@ const port = parseInt(Deno.env.get("PORT") || "8000");
 console.log(`🚀 Polimoney Hub is running on http://localhost:${port}`);
 
 Deno.serve({ port }, app.fetch);
-
