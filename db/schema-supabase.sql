@@ -213,6 +213,32 @@ VALUES
 ON CONFLICT (table_name) DO NOTHING;
 
 -- ============================================
+-- ロック解除リクエスト（Ledger から受信）
+-- ============================================
+
+-- Ledger の年度締め済み台帳のロック解除リクエスト
+CREATE TABLE IF NOT EXISTS unlock_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ledger_id UUID NOT NULL,                    -- Ledger 側の ledger ID
+    ledger_type VARCHAR(20) NOT NULL,           -- 'election' | 'organization'
+    fiscal_year INT,                            -- 政治団体台帳の場合のみ
+    requested_by_user_id UUID NOT NULL,         -- Ledger 側の user ID
+    requested_by_email VARCHAR(255) NOT NULL,
+    reason TEXT NOT NULL,                       -- 修正理由
+    status VARCHAR(20) DEFAULT 'pending',       -- 'pending' | 'approved' | 'rejected'
+    approved_at TIMESTAMPTZ,
+    approved_by UUID,                           -- Hub admin user ID
+    unlock_expires_at TIMESTAMPTZ,              -- 解除期限（承認から7日後）
+    rejection_reason TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_unlock_requests_status ON unlock_requests(status);
+CREATE INDEX IF NOT EXISTS idx_unlock_requests_ledger ON unlock_requests(ledger_id);
+CREATE INDEX IF NOT EXISTS idx_unlock_requests_expires ON unlock_requests(unlock_expires_at);
+
+-- ============================================
 -- 管理者テーブル（Supabase Auth 連携）
 -- ============================================
 
@@ -246,6 +272,7 @@ ALTER TABLE public_journals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ledger_change_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE election_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE unlock_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
 
 -- 読み取りポリシー（全員許可）
@@ -260,6 +287,7 @@ CREATE POLICY "Allow public read" ON public_journals FOR SELECT USING (true);
 CREATE POLICY "Allow public read" ON ledger_change_logs FOR SELECT USING (true);
 CREATE POLICY "Allow public read" ON election_requests FOR SELECT USING (true);
 CREATE POLICY "Allow public read" ON organization_requests FOR SELECT USING (true);
+CREATE POLICY "Allow public read" ON unlock_requests FOR SELECT USING (true);
 
 -- 管理者は自分のデータのみ読める
 CREATE POLICY "Admin users can read own data" ON admin_users FOR SELECT USING (auth.uid() = id);
@@ -276,4 +304,5 @@ CREATE POLICY "Allow service write" ON public_journals FOR ALL USING (auth.role(
 CREATE POLICY "Allow service write" ON ledger_change_logs FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Allow service write" ON election_requests FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Allow service write" ON organization_requests FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Allow service write" ON unlock_requests FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Allow service write" ON admin_users FOR ALL USING (auth.role() = 'service_role');
