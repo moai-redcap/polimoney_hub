@@ -10,6 +10,8 @@ try {
 import { Hono } from "hono";
 import { cors } from "jsr:@hono/hono@^4.6.0/cors";
 import { logger } from "jsr:@hono/hono@^4.6.0/logger";
+import { serveStatic } from "jsr:@hono/hono@^4.6.0/deno";
+import openApiSpec from "./openapi.json" with { type: "json" };
 import { apiKeyAuth } from "./middleware/auth.ts";
 import { adminAuth } from "./middleware/admin-auth.ts";
 import { politiciansRouter } from "./routes/politicians.ts";
@@ -18,6 +20,11 @@ import { electionsRouter } from "./routes/elections.ts";
 import { electionRequestsRouter } from "./routes/election-requests.ts";
 import { organizationRequestsRouter } from "./routes/organization-requests.ts";
 import { adminRouter } from "./routes/admin.ts";
+import { syncRouter } from "./routes/sync.ts";
+import { unlockRequestsRouter } from "./routes/unlock-requests.ts";
+import { masterRouter } from "./routes/master.ts";
+import { authRouter } from "./routes/auth.ts";
+import { polimoneyRouter } from "./routes/polimoney.ts";
 
 const app = new Hono();
 
@@ -38,6 +45,29 @@ app.get("/health", (c) => {
   return c.json({ status: "healthy" });
 });
 
+// OpenAPI Spec (JSON)
+app.get("/openapi.json", (c) => {
+  return c.json(openApiSpec);
+});
+
+// API ドキュメント (Scalar UI)
+app.get("/docs", (c) => {
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Polimoney Hub API - Documentation</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+</head>
+<body>
+  <script id="api-reference" data-url="/openapi.json"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>`;
+  return c.html(html);
+});
+
 // API routes (認証必要)
 const api = new Hono();
 api.use("*", apiKeyAuth);
@@ -47,11 +77,18 @@ api.route("/organizations", organizationsRouter);
 api.route("/elections", electionsRouter);
 api.route("/election-requests", electionRequestsRouter);
 api.route("/organization-requests", organizationRequestsRouter);
+api.route("/sync", syncRouter);
+api.route("/unlock-requests", unlockRequestsRouter);
+api.route("/master", masterRouter);
+api.route("/polimoney", polimoneyRouter);
 
 // Admin routes (管理者認証必要) - /api/v1 の前にマウント
 const admin = new Hono();
 admin.use("*", adminAuth);
 admin.route("/", adminRouter);
+
+// Auth routes (認証不要 - ログイン用)
+app.route("/api/auth", authRouter);
 
 // 注意: admin を先にマウントしないと /api/v1/* のミドルウェアが適用される
 app.route("/api/admin", admin);
