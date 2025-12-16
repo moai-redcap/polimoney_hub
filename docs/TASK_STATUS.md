@@ -114,29 +114,29 @@
 
 ### 公開 API（API キー認証）
 
-| Method | Endpoint                             | 説明                     |
-| ------ | ------------------------------------ | ------------------------ |
-| GET    | `/api/v1/politicians`                | 政治家一覧               |
-| GET    | `/api/v1/organizations`              | 政治団体一覧             |
-| GET    | `/api/v1/elections`                  | 選挙一覧                 |
-| POST   | `/api/v1/election-requests`          | 選挙登録リクエスト       |
-| POST   | `/api/v1/organization-requests`      | 団体登録リクエスト       |
-| POST   | `/api/v1/sync/journals`              | 仕訳データ同期           |
-| POST   | `/api/v1/sync/ledger`                | 台帳データ同期           |
-| DELETE | `/api/v1/sync/journals/:id`          | 仕訳削除                 |
-| POST   | `/api/v1/sync/journals/batch-delete` | 仕訳一括削除             |
-| GET    | `/api/v1/sync/status`                | 同期ステータス確認       |
-| POST   | `/api/v1/sync/change-log`            | 変更ログ記録             |
-| POST   | `/api/v1/unlock-requests`            | ロック解除リクエスト作成 |
-| GET    | `/api/v1/unlock-requests`            | ロック解除リクエスト一覧 |
-| GET    | `/api/v1/unlock-requests/check/:id`  | 解除状態確認             |
-| GET    | `/api/v1/master/account-codes`       | 勘定科目一覧             |
-| GET    | `/api/v1/master/account-codes/:code` | 勘定科目詳細             |
-| GET    | `/api/v1/master/election-types`      | 選挙タイプ一覧           |
-| GET    | `/api/v1/master/public-subsidy-items`| 選挙公営費目一覧         |
-| GET    | `/api/v1/master/municipalities`      | 市区町村一覧             |
-| GET    | `/api/v1/master/prefectures`         | 都道府県一覧             |
-| GET    | `/api/v1/master/metadata`            | マスタ更新日時           |
+| Method | Endpoint                              | 説明                     |
+| ------ | ------------------------------------- | ------------------------ |
+| GET    | `/api/v1/politicians`                 | 政治家一覧               |
+| GET    | `/api/v1/organizations`               | 政治団体一覧             |
+| GET    | `/api/v1/elections`                   | 選挙一覧                 |
+| POST   | `/api/v1/election-requests`           | 選挙登録リクエスト       |
+| POST   | `/api/v1/organization-requests`       | 団体登録リクエスト       |
+| POST   | `/api/v1/sync/journals`               | 仕訳データ同期           |
+| POST   | `/api/v1/sync/ledger`                 | 台帳データ同期           |
+| DELETE | `/api/v1/sync/journals/:id`           | 仕訳削除                 |
+| POST   | `/api/v1/sync/journals/batch-delete`  | 仕訳一括削除             |
+| GET    | `/api/v1/sync/status`                 | 同期ステータス確認       |
+| POST   | `/api/v1/sync/change-log`             | 変更ログ記録             |
+| POST   | `/api/v1/unlock-requests`             | ロック解除リクエスト作成 |
+| GET    | `/api/v1/unlock-requests`             | ロック解除リクエスト一覧 |
+| GET    | `/api/v1/unlock-requests/check/:id`   | 解除状態確認             |
+| GET    | `/api/v1/master/account-codes`        | 勘定科目一覧             |
+| GET    | `/api/v1/master/account-codes/:code`  | 勘定科目詳細             |
+| GET    | `/api/v1/master/election-types`       | 選挙タイプ一覧           |
+| GET    | `/api/v1/master/public-subsidy-items` | 選挙公営費目一覧         |
+| GET    | `/api/v1/master/municipalities`       | 市区町村一覧             |
+| GET    | `/api/v1/master/prefectures`          | 都道府県一覧             |
+| GET    | `/api/v1/master/metadata`             | マスタ更新日時           |
 
 ### 管理者 API（Bearer トークン認証）
 

@@ -1,8 +1,11 @@
 /**
  * 勘定科目マスタ・選挙タイプ・選挙公営費目の seed スクリプト
  *
- * 実行: deno run --allow-env --allow-net db/seed-account-codes.ts
+ * 実行: deno run --allow-env --allow-net --allow-read db/seed-account-codes.ts
  */
+
+// .env ファイルを読み込み
+import "https://deno.land/std@0.208.0/dotenv/load.ts";
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
