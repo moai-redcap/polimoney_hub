@@ -106,15 +106,22 @@ export const handler: Handlers<PageData, AuthState> = {
 
     // プロフィール更新
     const name = form.get("name")?.toString() || "";
+    const email = form.get("email")?.toString() || "";
 
     try {
+      const updateData: { name: string; email?: string } = { name };
+      // メールアドレスが変更された場合のみ含める
+      if (email && email !== ctx.state.user?.email) {
+        updateData.email = email;
+      }
+
       const res = await fetch(`${apiBase}/api/admin/users/${ctx.state.user?.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${ctx.state.accessToken}`,
         },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify(updateData),
       });
 
       // 現在の dev_mode を取得
@@ -215,13 +222,14 @@ export default function SettingsPage({ data }: PageProps<PageData>) {
                 </label>
                 <input
                   type="email"
+                  name="email"
                   value={data.user?.email || ""}
+                  placeholder="admin@example.com"
                   class="input input-bordered w-full max-w-md"
-                  disabled
                 />
                 <label class="label">
                   <span class="label-text-alt text-base-content/50">
-                    メールアドレスの変更は現在サポートされていません
+                    変更後は新しいメールアドレスでログインしてください
                   </span>
                 </label>
               </div>
