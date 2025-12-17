@@ -479,12 +479,25 @@ adminRouter.put("/users/:id", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json<{
     name?: string;
+    email?: string;
     role?: string;
     is_active?: boolean;
     dev_mode?: boolean;
   }>();
 
   const supabase = getServiceClient();
+
+  // メールアドレス変更の場合は Auth も更新
+  if (body.email !== undefined) {
+    const { error: authError } = await supabase.auth.admin.updateUserById(id, {
+      email: body.email,
+    });
+
+    if (authError) {
+      console.error("Failed to update email in Auth:", authError);
+      return c.json({ error: "Failed to update email: " + authError.message }, 500);
+    }
+  }
 
   // 更新するフィールドを構築
   const updates: Record<string, unknown> = {
@@ -493,6 +506,10 @@ adminRouter.put("/users/:id", async (c) => {
 
   if (body.name !== undefined) {
     updates.name = body.name;
+  }
+
+  if (body.email !== undefined) {
+    updates.email = body.email;
   }
 
   if (body.role !== undefined) {
