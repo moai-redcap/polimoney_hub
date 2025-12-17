@@ -30,7 +30,7 @@
 ```bash
 curl -H "X-API-Key: your-api-key" \
      -H "X-Service-Name: polimoney-ledger" \
-     http://localhost:8000/api/v1/politicians
+     http://localhost:3722/api/v1/politicians
 ```
 
 **エラーレスポンス:**
