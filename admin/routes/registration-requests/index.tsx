@@ -16,6 +16,7 @@ interface RegistrationRequest {
   rejection_reason: string | null;
   notes: string | null;
   admin_notes: string | null;
+  is_test: boolean;
   created_at: string;
   reviewed_at: string | null;
   reviewed_by: string | null;
@@ -24,6 +25,7 @@ interface RegistrationRequest {
 interface PageData {
   requests: RegistrationRequest[];
   status: string;
+  devMode: boolean;
   error?: string;
 }
 
@@ -53,8 +55,28 @@ export const handler: Handlers<PageData, AuthState> = {
 
     const apiBase = Deno.env.get("API_BASE_URL") || "http://localhost:3722";
 
+    // ユーザーの dev_mode を取得
+    let devMode = false;
     try {
-      const queryParams = status ? `?status=${status}` : "";
+      const userRes = await fetch(`${apiBase}/api/admin/users/${ctx.state.user?.id}`, {
+        headers: { Authorization: `Bearer ${ctx.state.accessToken}` },
+      });
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        devMode = userData.data?.dev_mode ?? false;
+      }
+    } catch {
+      // エラー時はデフォルト値
+    }
+
+    try {
+      const params = new URLSearchParams();
+      if (status) params.set("status", status);
+      // dev_mode が有効な場合はテスト申請を含める
+      if (devMode) params.set("include_test", "true");
+      const queryString = params.toString();
+      const queryParams = queryString ? `?${queryString}` : "";
+
       const res = await fetch(
         `${apiBase}/api/admin/registration-requests${queryParams}`,
         {
@@ -66,11 +88,13 @@ export const handler: Handlers<PageData, AuthState> = {
       return ctx.render({
         requests: data.data || [],
         status,
+        devMode,
       });
     } catch (error) {
       return ctx.render({
         requests: [],
         status,
+        devMode,
         error: error instanceof Error ? error.message : "Unknown error",
       });
     }
@@ -83,7 +107,22 @@ export default function RegistrationRequests({ data }: PageProps<PageData>) {
       <div class="space-y-6">
         <div class="flex items-center justify-between">
           <h1 class="text-3xl font-bold">👤 Ledger 登録申請</h1>
+          {data.devMode && (
+            <div class="badge badge-warning gap-1">
+              🧪 開発モード（テスト申請を表示中）
+            </div>
+          )}
         </div>
+
+        {/* 開発モードの説明 */}
+        {data.devMode && (
+          <div class="alert alert-info text-sm">
+            <span>
+              ℹ️ 開発モードが有効です。テスト申請（<code class="font-mono">is_test=true</code>）も表示されています。
+              <a href="/settings" class="link ml-2">設定で切り替え →</a>
+            </span>
+          </div>
+        )}
 
         {/* Filter tabs */}
         <div class="tabs tabs-boxed">
@@ -137,6 +176,11 @@ export default function RegistrationRequests({ data }: PageProps<PageData>) {
                         >
                           {statusLabels[request.status]?.label || request.status}
                         </span>
+                        {request.is_test && (
+                          <span class="badge badge-outline badge-sm">
+                            🧪 テスト
+                          </span>
+                        )}
                       </h2>
                       <p class="text-sm opacity-70">
                         {request.email}
