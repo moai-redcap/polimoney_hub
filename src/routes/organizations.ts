@@ -120,3 +120,48 @@ organizationsRouter.put("/:id", async (c) => {
 
   return c.json({ data });
 });
+
+// 【v2 追加】Ledgerユーザーが管理している政治団体一覧を取得
+organizationsRouter.get("/managed", async (c) => {
+  const ledgerUserId = c.req.query("ledger_user_id");
+
+  if (!ledgerUserId) {
+    return c.json({ error: "ledger_user_id is required" }, 400);
+  }
+
+  const supabase = getServiceClient();
+
+  // organization_managers テーブルから、このユーザーが管理している政治団体を取得
+  const { data: managers, error: managerError } = await supabase
+    .from("organization_managers")
+    .select(`
+      organization_id,
+      verified_at,
+      verified_domain,
+      organizations (
+        id,
+        name,
+        type,
+        official_url,
+        registration_authority,
+        is_active,
+        created_at,
+        updated_at
+      )
+    `)
+    .eq("ledger_user_id", ledgerUserId);
+
+  if (managerError) {
+    console.error("Failed to fetch managed organizations:", managerError);
+    return c.json({ error: managerError.message }, 500);
+  }
+
+  // レスポンスを整形
+  const data = managers?.map((m) => ({
+    ...(m.organizations as Organization),
+    verified_at: m.verified_at,
+    verified_domain: m.verified_domain,
+  })) || [];
+
+  return c.json({ data });
+});
