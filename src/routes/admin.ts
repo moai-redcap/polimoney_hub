@@ -793,3 +793,507 @@ adminRouter.get("/registration-requests", async (c) => {
   return c.json({ data, total: count });
 });
 
+// ============================================
+// 政治家認証申請管理（管理者用）【v2 追加】
+// ============================================
+
+interface PoliticianVerification {
+  id: string;
+  ledger_user_id: string;
+  politician_id: string | null;
+  name: string;
+  official_email: string;
+  official_url: string | null;
+  party: string | null;
+  email_verified: boolean;
+  email_verification_code: string | null;
+  email_verification_sent_at: string | null;
+  status: string;
+  rejection_reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// 政治家認証申請一覧（管理者用）
+adminRouter.get("/politician-verifications", async (c) => {
+  const status = c.req.query("status");
+  const supabase = getServiceClient();
+
+  let query = supabase
+    .from("politician_verifications")
+    .select("*", { count: "exact" });
+
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  const { data, error, count } = await query.order("created_at", {
+    ascending: false,
+  });
+
+  if (error) {
+    console.error("Failed to fetch politician verifications:", error);
+    return c.json({ error: "Failed to fetch politician verifications" }, 500);
+  }
+
+  return c.json({ data, total: count });
+});
+
+// 政治家認証申請詳細
+adminRouter.get("/politician-verifications/:id", async (c) => {
+  const id = c.req.param("id");
+  const supabase = getServiceClient();
+
+  const { data, error } = await supabase
+    .from("politician_verifications")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) {
+    return c.json({ error: "Politician verification not found" }, 404);
+  }
+
+  return c.json({ data });
+});
+
+// 政治家認証申請承認
+adminRouter.put("/politician-verifications/:id/approve", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json<{
+    reviewed_by?: string;
+  }>();
+
+  const supabase = getServiceClient();
+
+  // 申請を取得
+  const { data: verification, error: fetchError } = await supabase
+    .from("politician_verifications")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (fetchError || !verification) {
+    return c.json({ error: "Politician verification not found" }, 404);
+  }
+
+  if (verification.status !== "email_verified") {
+    return c.json({ error: "メール認証が完了していない申請は承認できません" }, 400);
+  }
+
+  const now = new Date().toISOString();
+  const emailDomain = verification.official_email.split("@")[1];
+
+  // politician_id が指定されている場合は既存の政治家を更新
+  // そうでない場合は新規作成
+  let politicianId = verification.politician_id;
+
+  if (politicianId) {
+    // 既存の政治家を更新
+    const { error: updatePoliticianError } = await supabase
+      .from("politicians")
+      .update({
+        ledger_user_id: verification.ledger_user_id,
+        official_url: verification.official_url,
+        party: verification.party,
+        is_verified: true,
+        verified_at: now,
+        verified_domain: emailDomain,
+        updated_at: now,
+      })
+      .eq("id", politicianId);
+
+    if (updatePoliticianError) {
+      console.error("Failed to update politician:", updatePoliticianError);
+      return c.json({ error: "Failed to update politician" }, 500);
+    }
+  } else {
+    // 新規政治家を作成
+    const { data: newPolitician, error: createError } = await supabase
+      .from("politicians")
+      .insert({
+        name: verification.name,
+        ledger_user_id: verification.ledger_user_id,
+        official_url: verification.official_url,
+        party: verification.party,
+        is_verified: true,
+        verified_at: now,
+        verified_domain: emailDomain,
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error("Failed to create politician:", createError);
+      return c.json({ error: "Failed to create politician" }, 500);
+    }
+
+    politicianId = newPolitician.id;
+  }
+
+  // 申請を承認済みに更新
+  const { data, error } = await supabase
+    .from("politician_verifications")
+    .update({
+      politician_id: politicianId,
+      status: "approved",
+      reviewed_by: body.reviewed_by || null,
+      reviewed_at: now,
+      updated_at: now,
+    })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Failed to approve politician verification:", error);
+    return c.json({ error: "Failed to approve politician verification" }, 500);
+  }
+
+  console.log(`[Admin] Politician verification approved: ${id}, politician_id: ${politicianId}`);
+
+  return c.json({
+    data,
+    politician_id: politicianId,
+    message: "政治家認証を承認しました",
+  });
+});
+
+// 政治家認証申請却下
+adminRouter.put("/politician-verifications/:id/reject", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json<{
+    rejection_reason: string;
+    reviewed_by?: string;
+  }>();
+
+  if (!body.rejection_reason) {
+    return c.json({ error: "rejection_reason is required" }, 400);
+  }
+
+  const supabase = getServiceClient();
+
+  // 申請を取得
+  const { data: verification, error: fetchError } = await supabase
+    .from("politician_verifications")
+    .select("status")
+    .eq("id", id)
+    .single();
+
+  if (fetchError || !verification) {
+    return c.json({ error: "Politician verification not found" }, 404);
+  }
+
+  if (verification.status === "approved" || verification.status === "rejected") {
+    return c.json({ error: "この申請はすでに処理されています" }, 400);
+  }
+
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("politician_verifications")
+    .update({
+      status: "rejected",
+      rejection_reason: body.rejection_reason,
+      reviewed_by: body.reviewed_by || null,
+      reviewed_at: now,
+      updated_at: now,
+    })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Failed to reject politician verification:", error);
+    return c.json({ error: "Failed to reject politician verification" }, 500);
+  }
+
+  console.log(`[Admin] Politician verification rejected: ${id}`);
+
+  return c.json({ data });
+});
+
+// ============================================
+// 政治団体管理者認証申請管理（管理者用）【v2 追加】
+// ============================================
+
+interface OrganizationManagerVerification {
+  id: string;
+  ledger_user_id: string;
+  organization_id: string | null;
+  organization_name: string;
+  official_email: string;
+  role_in_organization: string | null;
+  email_verified: boolean;
+  status: string;
+  rejection_reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// 政治団体管理者認証申請一覧（管理者用）
+adminRouter.get("/organization-manager-verifications", async (c) => {
+  const status = c.req.query("status");
+  const supabase = getServiceClient();
+
+  let query = supabase
+    .from("organization_manager_verifications")
+    .select("*", { count: "exact" });
+
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  const { data, error, count } = await query.order("created_at", {
+    ascending: false,
+  });
+
+  if (error) {
+    console.error("Failed to fetch organization manager verifications:", error);
+    return c.json({ error: "Failed to fetch organization manager verifications" }, 500);
+  }
+
+  return c.json({ data, total: count });
+});
+
+// 政治団体管理者認証申請承認
+adminRouter.put("/organization-manager-verifications/:id/approve", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json<{
+    reviewed_by?: string;
+  }>();
+
+  const supabase = getServiceClient();
+
+  // 申請を取得
+  const { data: verification, error: fetchError } = await supabase
+    .from("organization_manager_verifications")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (fetchError || !verification) {
+    return c.json({ error: "Organization manager verification not found" }, 404);
+  }
+
+  if (verification.status !== "email_verified") {
+    return c.json({ error: "メール認証が完了していない申請は承認できません" }, 400);
+  }
+
+  const now = new Date().toISOString();
+  const emailDomain = verification.official_email.split("@")[1];
+
+  // organization_id が指定されていない場合は新規作成
+  let organizationId = verification.organization_id;
+
+  if (!organizationId) {
+    // 新規政治団体を作成（認証済みで作成）
+    const { data: newOrg, error: createError } = await supabase
+      .from("organizations")
+      .insert({
+        name: verification.organization_name,
+        type: verification.organization_type || "other",
+        official_url: null,
+        is_verified: true,
+        verified_at: now,
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error("Failed to create organization:", createError);
+      return c.json({ error: "Failed to create organization" }, 500);
+    }
+
+    organizationId = newOrg.id;
+  } else {
+    // 既存の政治団体を認証済みに更新
+    const { error: updateOrgError } = await supabase
+      .from("organizations")
+      .update({
+        is_verified: true,
+        verified_at: now,
+        updated_at: now,
+      })
+      .eq("id", organizationId);
+
+    if (updateOrgError) {
+      console.error("Failed to update organization verification:", updateOrgError);
+      return c.json({ error: "Failed to update organization verification" }, 500);
+    }
+  }
+
+  // organization_managers に追加
+  const { error: managerError } = await supabase
+    .from("organization_managers")
+    .upsert({
+      ledger_user_id: verification.ledger_user_id,
+      organization_id: organizationId,
+      verified_at: now,
+      verified_domain: emailDomain,
+      verified_email: verification.official_email,
+    });
+
+  if (managerError) {
+    console.error("Failed to add organization manager:", managerError);
+    return c.json({ error: "Failed to add organization manager" }, 500);
+  }
+
+  // 申請を承認済みに更新
+  const { data, error } = await supabase
+    .from("organization_manager_verifications")
+    .update({
+      organization_id: organizationId,
+      status: "approved",
+      reviewed_by: body.reviewed_by || null,
+      reviewed_at: now,
+      updated_at: now,
+    })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Failed to approve organization manager verification:", error);
+    return c.json({ error: "Failed to approve organization manager verification" }, 500);
+  }
+
+  console.log(`[Admin] Organization manager verification approved: ${id}, organization_id: ${organizationId}`);
+
+  return c.json({
+    data,
+    organization_id: organizationId,
+    message: "政治団体管理者認証を承認しました",
+  });
+});
+
+// 政治団体管理者認証申請却下
+adminRouter.put("/organization-manager-verifications/:id/reject", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json<{
+    rejection_reason: string;
+    reviewed_by?: string;
+  }>();
+
+  if (!body.rejection_reason) {
+    return c.json({ error: "rejection_reason is required" }, 400);
+  }
+
+  const supabase = getServiceClient();
+
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("organization_manager_verifications")
+    .update({
+      status: "rejected",
+      rejection_reason: body.rejection_reason,
+      reviewed_by: body.reviewed_by || null,
+      reviewed_at: now,
+      updated_at: now,
+    })
+    .eq("id", id)
+    .eq("status", "email_verified")
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Failed to reject organization manager verification:", error);
+    return c.json({ error: "Verification not found or already processed" }, 404);
+  }
+
+  console.log(`[Admin] Organization manager verification rejected: ${id}`);
+
+  return c.json({ data });
+});
+
+// ============================================
+// なりすまし通報管理（管理者用）【v2 追加】
+// ============================================
+
+// なりすまし通報一覧（管理者用）
+adminRouter.get("/impersonation-reports", async (c) => {
+  const status = c.req.query("status");
+  const supabase = getServiceClient();
+
+  let query = supabase
+    .from("impersonation_reports")
+    .select("*", { count: "exact" });
+
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  const { data, error, count } = await query.order("created_at", {
+    ascending: false,
+  });
+
+  if (error) {
+    console.error("Failed to fetch impersonation reports:", error);
+    return c.json({ error: "Failed to fetch impersonation reports" }, 500);
+  }
+
+  return c.json({ data, total: count });
+});
+
+// なりすまし通報詳細
+adminRouter.get("/impersonation-reports/:id", async (c) => {
+  const id = c.req.param("id");
+  const supabase = getServiceClient();
+
+  const { data, error } = await supabase
+    .from("impersonation_reports")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) {
+    return c.json({ error: "Impersonation report not found" }, 404);
+  }
+
+  return c.json({ data });
+});
+
+// なりすまし通報対応完了
+adminRouter.put("/impersonation-reports/:id/resolve", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json<{
+    resolution_notes: string;
+    reviewed_by?: string;
+  }>();
+
+  if (!body.resolution_notes) {
+    return c.json({ error: "resolution_notes is required" }, 400);
+  }
+
+  const supabase = getServiceClient();
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("impersonation_reports")
+    .update({
+      status: "resolved",
+      resolution_notes: body.resolution_notes,
+      reviewed_by: body.reviewed_by || null,
+      reviewed_at: now,
+      updated_at: now,
+    })
+    .eq("id", id)
+    .eq("status", "pending")
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Failed to resolve impersonation report:", error);
+    return c.json({ error: "Report not found or already processed" }, 404);
+  }
+
+  console.log(`[Admin] Impersonation report resolved: ${id}`);
+
+  return c.json({ data });
+});
+

@@ -26,6 +26,10 @@ import { masterRouter } from "./routes/master.ts";
 import { authRouter } from "./routes/auth.ts";
 import { polimoneyRouter } from "./routes/polimoney.ts";
 import registrationRequestsRouter from "./routes/registration-requests.ts";
+import { politicianVerificationsRouter } from "./routes/politician-verifications.ts";
+import { organizationManagerVerificationsRouter } from "./routes/organization-manager-verifications.ts";
+import { publicRouter } from "./routes/public.ts";
+import { impersonationReportsRouter } from "./routes/impersonation-reports.ts";
 
 const app = new Hono();
 
@@ -83,6 +87,9 @@ api.route("/unlock-requests", unlockRequestsRouter);
 api.route("/master", masterRouter);
 api.route("/polimoney", polimoneyRouter);
 api.route("/registration-requests", registrationRequestsRouter);
+// v2: 認証関連API
+api.route("/politician-verifications", politicianVerificationsRouter);
+api.route("/organization-manager-verifications", organizationManagerVerificationsRouter);
 
 // Admin routes (管理者認証必要) - /api/v1 の前にマウント
 const admin = new Hono();
@@ -91,6 +98,10 @@ admin.route("/", adminRouter);
 
 // Auth routes (認証不要 - ログイン用)
 app.route("/api/auth", authRouter);
+
+// Public routes (認証不要 - 公開ページ用)
+app.route("/api/public", publicRouter);
+app.route("/api/public/impersonation-reports", impersonationReportsRouter);
 
 // 注意: admin を先にマウントしないと /api/v1/* のミドルウェアが適用される
 app.route("/api/admin", admin);
