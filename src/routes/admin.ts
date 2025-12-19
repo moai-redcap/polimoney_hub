@@ -1091,13 +1091,15 @@ adminRouter.put("/organization-manager-verifications/:id/approve", async (c) => 
   let organizationId = verification.organization_id;
 
   if (!organizationId) {
-    // 新規政治団体を作成
+    // 新規政治団体を作成（認証済みで作成）
     const { data: newOrg, error: createError } = await supabase
       .from("organizations")
       .insert({
         name: verification.organization_name,
-        type: "other",
+        type: verification.organization_type || "other",
         official_url: null,
+        is_verified: true,
+        verified_at: now,
       })
       .select()
       .single();
@@ -1108,6 +1110,21 @@ adminRouter.put("/organization-manager-verifications/:id/approve", async (c) => 
     }
 
     organizationId = newOrg.id;
+  } else {
+    // 既存の政治団体を認証済みに更新
+    const { error: updateOrgError } = await supabase
+      .from("organizations")
+      .update({
+        is_verified: true,
+        verified_at: now,
+        updated_at: now,
+      })
+      .eq("id", organizationId);
+
+    if (updateOrgError) {
+      console.error("Failed to update organization verification:", updateOrgError);
+      return c.json({ error: "Failed to update organization verification" }, 500);
+    }
   }
 
   // organization_managers に追加
@@ -1118,6 +1135,7 @@ adminRouter.put("/organization-manager-verifications/:id/approve", async (c) => 
       organization_id: organizationId,
       verified_at: now,
       verified_domain: emailDomain,
+      verified_email: verification.official_email,
     });
 
   if (managerError) {
