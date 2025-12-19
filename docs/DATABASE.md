@@ -17,24 +17,28 @@ Polimoney Hub は、政治資金の透明性を実現するための **共通マ
 
 ## テーブル一覧
 
-| テーブル名              | 説明                        | 件数目安    |
-| ----------------------- | --------------------------- | ----------- |
-| `municipalities`        | 市区町村マスタ              | 約 1,800 件 |
-| `districts`             | 選挙区マスタ                | 約 4,000 件 |
-| `politicians`           | 政治家マスタ                | 随時追加    |
-| `organizations`         | 政治団体マスタ              | 随時追加    |
-| `elections`             | 選挙マスタ                  | 随時追加    |
-| `election_types`        | 選挙タイプマスタ            | 6 件        |
-| `account_codes`         | 勘定科目マスタ              | 約 50 件    |
-| `public_subsidy_items`  | 公費負担項目マスタ          | 約 20 件    |
-| `master_metadata`       | マスタ更新日時              | 8 件        |
-| `public_ledgers`        | 公開台帳（Ledger から同期） | -           |
-| `public_journals`       | 公開仕訳（Ledger から同期） | -           |
-| `ledger_change_logs`    | 台帳変更ログ                | -           |
-| `election_requests`     | 選挙登録リクエスト          | -           |
-| `organization_requests` | 政治団体登録リクエスト      | -           |
-| `unlock_requests`       | ロック解除リクエスト        | -           |
-| `admin_users`           | 管理者ユーザー              | -           |
+| テーブル名                           | 説明                                   | 件数目安    |
+| ------------------------------------ | -------------------------------------- | ----------- |
+| `municipalities`                     | 市区町村マスタ                         | 約 1,800 件 |
+| `districts`                          | 選挙区マスタ                           | 約 4,000 件 |
+| `politicians`                        | 政治家マスタ                           | 随時追加    |
+| `organizations`                      | 政治団体マスタ                         | 随時追加    |
+| `elections`                          | 選挙マスタ                             | 随時追加    |
+| `election_types`                     | 選挙タイプマスタ                       | 6 件        |
+| `account_codes`                      | 勘定科目マスタ                         | 約 50 件    |
+| `public_subsidy_items`               | 公費負担項目マスタ                     | 約 20 件    |
+| `master_metadata`                    | マスタ更新日時                         | 8 件        |
+| `public_ledgers`                     | 公開台帳（Ledger から同期）            | -           |
+| `public_journals`                    | 公開仕訳（Ledger から同期）            | -           |
+| `ledger_change_logs`                 | 台帳変更ログ                           | -           |
+| `election_requests`                  | 選挙登録リクエスト                     | -           |
+| `organization_requests`              | 政治団体登録リクエスト                 | -           |
+| `unlock_requests`                    | ロック解除リクエスト                   | -           |
+| `admin_users`                        | 管理者ユーザー                         | -           |
+| `politician_verifications`           | **【v2 追加】政治家認証申請**          | -           |
+| `organization_manager_verifications` | **【v2 追加】政治団体管理者認証申請**  | -           |
+| `organization_managers`              | **【v2 追加】政治団体管理者マッピング**| -           |
+| `impersonation_reports`              | **【v2 追加】なりすまし通報**          | -           |
 
 ---
 
@@ -167,29 +171,38 @@ Polimoney Hub は、政治資金の透明性を実現するための **共通マ
 
 ---
 
-### politicians（政治家マスタ）
+### politicians（政治家マスタ）【v2 更新】
 
-| カラム       | 型                      | 説明             |
-| ------------ | ----------------------- | ---------------- |
-| `id`         | UUID PK                 | UUID（自動生成） |
-| `name`       | VARCHAR                 | 氏名             |
-| `name_kana`  | VARCHAR                 | 氏名（カナ）     |
-| `created_at` | TIMESTAMPTZ DEFAULT NOW | 作成日時         |
-| `updated_at` | TIMESTAMPTZ DEFAULT NOW | 更新日時         |
+| カラム            | 型                       | 説明                                         |
+| ----------------- | ------------------------ | -------------------------------------------- |
+| `id`              | UUID PK                  | UUID（自動生成）                             |
+| `name`            | VARCHAR                  | 氏名                                         |
+| `name_kana`       | VARCHAR                  | 氏名（カナ）                                 |
+| `ledger_user_id`  | UUID                     | **【v2 追加】Ledger 側の認証済みユーザー ID**|
+| `official_url`    | TEXT                     | **【v2 追加】公式サイト URL**                |
+| `party`           | TEXT                     | **【v2 追加】所属政党（または無所属）**      |
+| `photo_url`       | TEXT                     | **【v2 追加】顔写真 URL**                    |
+| `is_verified`     | BOOLEAN DEFAULT FALSE    | **【v2 追加】認証済みフラグ**                |
+| `verified_at`     | TIMESTAMPTZ              | **【v2 追加】認証日時**                      |
+| `verified_domain` | TEXT                     | **【v2 追加】認証に使用した公式ドメイン**    |
+| `created_at`      | TIMESTAMPTZ DEFAULT NOW  | 作成日時                                     |
+| `updated_at`      | TIMESTAMPTZ DEFAULT NOW  | 更新日時                                     |
 
 ---
 
-### organizations（政治団体マスタ）
+### organizations（政治団体マスタ）【v2 更新】
 
-| カラム          | 型                      | 説明                   |
-| --------------- | ----------------------- | ---------------------- |
-| `id`            | UUID PK                 | UUID（自動生成）       |
-| `name`          | VARCHAR                 | 団体名                 |
-| `type`          | VARCHAR(50)             | 団体タイプ（下記参照） |
-| `politician_id` | UUID FK                 | 関連政治家 ID          |
-| `is_active`     | BOOLEAN DEFAULT TRUE    | 有効フラグ             |
-| `created_at`    | TIMESTAMPTZ DEFAULT NOW | 作成日時               |
-| `updated_at`    | TIMESTAMPTZ DEFAULT NOW | 更新日時               |
+| カラム                   | 型                      | 説明                                 |
+| ------------------------ | ----------------------- | ------------------------------------ |
+| `id`                     | UUID PK                 | UUID（自動生成）                     |
+| `name`                   | VARCHAR                 | 団体名                               |
+| `type`                   | VARCHAR(50)             | 団体タイプ（下記参照）               |
+| `politician_id`          | UUID FK                 | 関連政治家 ID                        |
+| `official_url`           | TEXT                    | **【v2 追加】公式サイト URL**        |
+| `registration_authority` | TEXT                    | **【v2 追加】届出先選挙管理委員会**  |
+| `is_active`              | BOOLEAN DEFAULT TRUE    | 有効フラグ                           |
+| `created_at`             | TIMESTAMPTZ DEFAULT NOW | 作成日時                             |
+| `updated_at`             | TIMESTAMPTZ DEFAULT NOW | 更新日時                             |
 
 **団体タイプ (`type`):**
 
@@ -410,6 +423,120 @@ Ledger から同期された公開用の収支報告書。
 | `dev_mode`   | BOOLEAN DEFAULT FALSE   | 開発モードフラグ  |
 | `created_at` | TIMESTAMPTZ DEFAULT NOW | 作成日時          |
 | `updated_at` | TIMESTAMPTZ DEFAULT NOW | 更新日時          |
+
+---
+
+## アカウント認証【v2 追加】
+
+### politician_verifications（政治家認証申請）
+
+Ledger ユーザーからの政治家認証申請を管理。公式ドメインのメール認証を必須とする。
+
+| カラム                    | 型                        | 説明                           |
+| ------------------------- | ------------------------- | ------------------------------ |
+| `id`                      | UUID PK                   | UUID（自動生成）               |
+| `ledger_user_id`          | UUID NOT NULL             | 申請者の Ledger ユーザー ID    |
+| `politician_id`           | UUID FK                   | 認証対象の政治家 ID（任意）    |
+| `name`                    | TEXT NOT NULL             | 申請者の氏名                   |
+| `official_email`          | TEXT NOT NULL             | 公式メールアドレス             |
+| `official_url`            | TEXT                      | 公式サイト URL                 |
+| `party`                   | TEXT                      | 所属政党（または無所属）       |
+| `email_verified`          | BOOLEAN DEFAULT FALSE     | メール認証完了フラグ           |
+| `email_verification_code` | TEXT                      | メール認証コード               |
+| `email_verification_sent_at` | TIMESTAMPTZ            | 認証コード送信日時             |
+| `status`                  | TEXT DEFAULT 'pending'    | ステータス                     |
+| `rejection_reason`        | TEXT                      | 却下理由                       |
+| `reviewed_by`             | UUID                      | レビュー者 ID                  |
+| `reviewed_at`             | TIMESTAMPTZ               | レビュー日時                   |
+| `created_at`              | TIMESTAMPTZ DEFAULT NOW   | 作成日時                       |
+| `updated_at`              | TIMESTAMPTZ DEFAULT NOW   | 更新日時                       |
+
+**ステータス (`status`):**
+
+| 値                 | 説明                       |
+| ------------------ | -------------------------- |
+| `pending`          | 審査待ち                   |
+| `email_sent`       | メール認証コード送信済み   |
+| `email_verified`   | メール認証完了、審査待ち   |
+| `approved`         | 承認済み                   |
+| `rejected`         | 却下                       |
+
+---
+
+### organization_manager_verifications（政治団体管理者認証申請）
+
+Ledger ユーザーからの政治団体管理者認証申請を管理。
+
+| カラム                    | 型                        | 説明                           |
+| ------------------------- | ------------------------- | ------------------------------ |
+| `id`                      | UUID PK                   | UUID（自動生成）               |
+| `ledger_user_id`          | UUID NOT NULL             | 申請者の Ledger ユーザー ID    |
+| `organization_id`         | UUID FK                   | 認証対象の政治団体 ID          |
+| `organization_name`       | TEXT NOT NULL             | 政治団体名（新規の場合）       |
+| `official_email`          | TEXT NOT NULL             | 公式メールアドレス             |
+| `role_in_organization`    | TEXT                      | 団体内の役割（代表者等）       |
+| `email_verified`          | BOOLEAN DEFAULT FALSE     | メール認証完了フラグ           |
+| `email_verification_code` | TEXT                      | メール認証コード               |
+| `email_verification_sent_at` | TIMESTAMPTZ            | 認証コード送信日時             |
+| `status`                  | TEXT DEFAULT 'pending'    | ステータス                     |
+| `rejection_reason`        | TEXT                      | 却下理由                       |
+| `reviewed_by`             | UUID                      | レビュー者 ID                  |
+| `reviewed_at`             | TIMESTAMPTZ               | レビュー日時                   |
+| `created_at`              | TIMESTAMPTZ DEFAULT NOW   | 作成日時                       |
+| `updated_at`              | TIMESTAMPTZ DEFAULT NOW   | 更新日時                       |
+
+---
+
+### organization_managers（政治団体管理者マッピング）
+
+承認された政治団体管理者と政治団体の紐付けを管理。
+
+| カラム            | 型                        | 説明                           |
+| ----------------- | ------------------------- | ------------------------------ |
+| `id`              | UUID PK                   | UUID（自動生成）               |
+| `ledger_user_id`  | UUID NOT NULL             | Ledger ユーザー ID             |
+| `organization_id` | UUID FK NOT NULL          | 政治団体 ID                    |
+| `verified_at`     | TIMESTAMPTZ               | 認証日時                       |
+| `verified_domain` | TEXT                      | 認証に使用した公式ドメイン     |
+| `created_at`      | TIMESTAMPTZ DEFAULT NOW   | 作成日時                       |
+| `updated_at`      | TIMESTAMPTZ DEFAULT NOW   | 更新日時                       |
+
+**ユニーク制約:** `(ledger_user_id, organization_id)`
+
+---
+
+### impersonation_reports（なりすまし通報）
+
+公開ページからのなりすまし通報を管理。
+
+| カラム             | 型                        | 説明                           |
+| ------------------ | ------------------------- | ------------------------------ |
+| `id`               | UUID PK                   | UUID（自動生成）               |
+| `report_type`      | TEXT NOT NULL             | 通報種別（politician/organization）|
+| `target_id`        | UUID NOT NULL             | 対象の政治家/政治団体 ID       |
+| `reporter_name`    | TEXT NOT NULL             | 通報者氏名                     |
+| `reporter_email`   | TEXT NOT NULL             | 通報者メールアドレス           |
+| `reporter_phone`   | TEXT                      | 通報者電話番号                 |
+| `reporter_address` | TEXT                      | 通報者住所                     |
+| `evidence_type`    | TEXT NOT NULL             | 証拠種別（id_card/badge/certificate）|
+| `evidence_description` | TEXT                  | 証拠の説明                     |
+| `evidence_file_url` | TEXT                     | 証拠ファイル URL               |
+| `status`           | TEXT DEFAULT 'pending'    | ステータス                     |
+| `resolution_notes` | TEXT                      | 対応メモ                       |
+| `reviewed_by`      | UUID                      | レビュー者 ID                  |
+| `reviewed_at`      | TIMESTAMPTZ               | レビュー日時                   |
+| `created_at`       | TIMESTAMPTZ DEFAULT NOW   | 作成日時                       |
+| `updated_at`       | TIMESTAMPTZ DEFAULT NOW   | 更新日時                       |
+
+**証拠種別 (`evidence_type`):**
+
+| 値            | 説明                       |
+| ------------- | -------------------------- |
+| `id_card`     | 身分証明書                 |
+| `badge`       | 議員バッジ                 |
+| `certificate` | 当選証書・設立届出書など   |
+
+> **注意:** 名刺は証拠として受け付けない（偽造が容易なため）
 
 ---
 
