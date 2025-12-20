@@ -237,19 +237,21 @@ const organizationRequests = [
 
 const organizationManagers = [
   {
-    id: "mmmm1111-1111-1111-1111-111111111111",
+    id: "ffff1111-1111-1111-1111-111111111111",
     ledger_user_id: "00000000-0000-0000-0000-000000000001",  // Ledger テストユーザー
     organization_id: "aaaa1111-1111-1111-1111-111111111111", // 山田太郎後援会
+    verified_email: "test-dev@polimoney.local",
     verified_at: new Date().toISOString(),
-    verified_domain: "example.lg.jp",
+    verified_domain: "polimoney.local",
     is_active: true,
   },
   {
-    id: "mmmm1111-2222-2222-2222-222222222222",
+    id: "ffff1111-2222-2222-2222-222222222222",
     ledger_user_id: "00000000-0000-0000-0000-000000000001",  // Ledger テストユーザー
     organization_id: "aaaa1111-2222-2222-2222-222222222222", // 山田太郎を応援する会
+    verified_email: "test-dev@polimoney.local",
     verified_at: new Date().toISOString(),
-    verified_domain: "example.lg.jp",
+    verified_domain: "polimoney.local",
     is_active: true,
   },
 ];
