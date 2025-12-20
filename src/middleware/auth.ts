@@ -36,12 +36,18 @@ export async function apiKeyAuth(c: Context, next: Next) {
   }
 
   // 環境を識別してログ用に記録
-  const env = apiKey === Deno.env.get("API_KEY_PROD") ? "prod" : "dev";
+  const isDevKey = apiKey === Deno.env.get("API_KEY_DEV");
+  const env = isDevKey ? "dev" : "prod";
   c.set("apiEnv", env);
+
+  // テストモードフラグ（DEV キー = テストデータ）
+  c.set("isTestMode", isDevKey);
 
   // サービス名をログ用に記録
   const serviceName = c.req.header("X-Service-Name") || "unknown";
   c.set("serviceName", serviceName);
+
+  console.log(`[Auth] API call from ${serviceName}, env: ${env}, isTestMode: ${isDevKey}`);
 
   await next();
 }
