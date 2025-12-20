@@ -892,17 +892,26 @@ adminRouter.put("/politician-verifications/:id/approve", async (c) => {
 
   if (politicianId) {
     // 既存の政治家を更新
+    // ドメイン変更の場合は official_url を空にする（ドメインが変わるため）
+    const updateData: Record<string, unknown> = {
+      ledger_user_id: verification.ledger_user_id,
+      party: verification.party,
+      is_verified: true,
+      verified_at: now,
+      verified_domain: emailDomain,
+      updated_at: now,
+    };
+
+    if (verification.request_type === "domain_change") {
+      // ドメイン変更時は公式URLをクリア
+      updateData.official_url = null;
+    } else {
+      updateData.official_url = verification.official_url;
+    }
+
     const { error: updatePoliticianError } = await supabase
       .from("politicians")
-      .update({
-        ledger_user_id: verification.ledger_user_id,
-        official_url: verification.official_url,
-        party: verification.party,
-        is_verified: true,
-        verified_at: now,
-        verified_domain: emailDomain,
-        updated_at: now,
-      })
+      .update(updateData)
       .eq("id", politicianId);
 
     if (updatePoliticianError) {
@@ -1112,13 +1121,20 @@ adminRouter.put("/organization-manager-verifications/:id/approve", async (c) => 
     organizationId = newOrg.id;
   } else {
     // 既存の政治団体を認証済みに更新
+    // ドメイン変更の場合は official_url を空にする
+    const updateData: Record<string, unknown> = {
+      is_verified: true,
+      verified_at: now,
+      updated_at: now,
+    };
+
+    if (verification.request_type === "domain_change") {
+      updateData.official_url = null;
+    }
+
     const { error: updateOrgError } = await supabase
       .from("organizations")
-      .update({
-        is_verified: true,
-        verified_at: now,
-        updated_at: now,
-      })
+      .update(updateData)
       .eq("id", organizationId);
 
     if (updateOrgError) {
