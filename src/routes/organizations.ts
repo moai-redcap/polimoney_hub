@@ -47,70 +47,62 @@ organizationsRouter.get("/managed", async (c) => {
 
   const supabase = getServiceClient();
 
-  // organization_managers テーブルから、このユーザーが管理している政治団体を取得
-  // is_test フィルタリング: DEV キー → is_test=true、PROD キー → is_test=false/null
-  let query = supabase
+  // Step 1: organization_managers からこのユーザーが管理している団体 ID を取得
+  let managerQuery = supabase
     .from("organization_managers")
-    .select(`
-      organization_id,
-      verified_at,
-      verified_domain,
-      is_test,
-      organizations (
-        id,
-        name,
-        type,
-        official_url,
-        registration_authority,
-        established_date,
-        office_address,
-        representative_name,
-        accountant_name,
-        contact_email,
-        description,
-        sns_x,
-        sns_instagram,
-        sns_facebook,
-        sns_tiktok,
-        logo_url,
-        is_verified,
-        is_active,
-        is_test,
-        created_at,
-        updated_at
-      )
-    `)
+    .select("organization_id, verified_at, verified_domain, is_test")
     .eq("ledger_user_id", ledgerUserId)
     .eq("is_active", true);
 
   // is_test フィルタリング
   if (isTestMode) {
-    query = query.eq("is_test", true);
+    managerQuery = managerQuery.eq("is_test", true);
   } else {
-    query = query.or("is_test.is.null,is_test.eq.false");
+    managerQuery = managerQuery.or("is_test.is.null,is_test.eq.false");
   }
 
-  const { data: managers, error: managerError } = await query;
+  const { data: managers, error: managerError } = await managerQuery;
 
   if (managerError) {
-    console.error("Failed to fetch managed organizations:", managerError);
+    console.error("Failed to fetch organization managers:", managerError);
     return c.json({ error: managerError.message }, 500);
   }
 
-  // レスポンスを整形（organizations の is_test もフィルタ）
-  // deno-lint-ignore no-explicit-any
-  const data = managers?.filter((m: any) => {
-    const orgIsTest = m.organizations?.is_test;
-    if (isTestMode) {
-      return orgIsTest === true;
-    } else {
-      return orgIsTest === null || orgIsTest === false;
-    }
-  }).map((m: any) => ({
-    ...m.organizations,
-    manager_verified_at: m.verified_at,
-    manager_verified_domain: m.verified_domain,
-  })) || [];
+  if (!managers || managers.length === 0) {
+    return c.json({ data: [] });
+  }
+
+  // Step 2: 取得した organization_id で organizations を取得
+  const orgIds = managers.map((m) => m.organization_id);
+  
+  let orgQuery = supabase
+    .from("organizations")
+    .select("*")
+    .in("id", orgIds);
+
+  // is_test フィルタリング
+  if (isTestMode) {
+    orgQuery = orgQuery.eq("is_test", true);
+  } else {
+    orgQuery = orgQuery.or("is_test.is.null,is_test.eq.false");
+  }
+
+  const { data: orgs, error: orgError } = await orgQuery;
+
+  if (orgError) {
+    console.error("Failed to fetch organizations:", orgError);
+    return c.json({ error: orgError.message }, 500);
+  }
+
+  // Step 3: managers と organizations をマージ
+  const orgMap = new Map(orgs?.map((o) => [o.id, o]) || []);
+  const data = managers
+    .filter((m) => orgMap.has(m.organization_id))
+    .map((m) => ({
+      ...orgMap.get(m.organization_id),
+      manager_verified_at: m.verified_at,
+      manager_verified_domain: m.verified_domain,
+    }));
 
   return c.json({ data });
 });
