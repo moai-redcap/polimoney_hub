@@ -81,17 +81,28 @@ politiciansRouter.put("/:id", async (c) => {
     official_url?: string | null;
     party?: string | null;
     photo_url?: string | null;
+    // SNS
+    sns_x?: string | null;
+    sns_instagram?: string | null;
+    sns_facebook?: string | null;
+    sns_tiktok?: string | null;
   }>();
 
   const updateData: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   };
 
+  // 基本情報
   if (body.name !== undefined) updateData.name = body.name;
   if (body.name_kana !== undefined) updateData.name_kana = body.name_kana;
   if (body.official_url !== undefined) updateData.official_url = body.official_url;
   if (body.party !== undefined) updateData.party = body.party;
   if (body.photo_url !== undefined) updateData.photo_url = body.photo_url;
+  // SNS
+  if (body.sns_x !== undefined) updateData.sns_x = body.sns_x;
+  if (body.sns_instagram !== undefined) updateData.sns_instagram = body.sns_instagram;
+  if (body.sns_facebook !== undefined) updateData.sns_facebook = body.sns_facebook;
+  if (body.sns_tiktok !== undefined) updateData.sns_tiktok = body.sns_tiktok;
 
   const supabase = getServiceClient();
   const { data, error } = await supabase
