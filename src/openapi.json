@@ -15,7 +15,7 @@
       "description": "ローカル開発環境"
     },
     {
-      "url": "https://polimoney-hub.dd2030-topics.deno.net",
+      "url": "https://api.polimoney.dd2030.org",
       "description": "本番環境"
     }
   ],
