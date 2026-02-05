@@ -1,0 +1,44 @@
+from typing import List, Optional
+
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    """アプリケーション設定
+
+    アプリケーション全体の設定を管理するクラス。
+    """
+
+    # Application settings
+    env: str = Field("development", env="ENV")
+    debug: bool = Field(True, env="DEBUG")
+
+    # Server settings
+    host: str = Field("0.0.0.0", env="HOST")
+    port: int = Field(8000, env="PORT")
+
+    # CORS settings
+    cors_origins: List[str] = Field(
+        ["http://localhost:3000", "http://localhost:8080"], env="CORS_ORIGINS"
+    )
+
+    # Supabase settings
+    supabase_url: Optional[str] = Field(None, env="SUPABASE_URL")
+    supabase_secret_key: Optional[str] = Field(None, env="SUPABASE_SECRET_KEY")
+    supabase_publishable_key: Optional[str] = Field(
+        None, env="SUPABASE_PUBLISHABLE_KEY"
+    )
+
+    class Config:
+        """Pydantic設定
+
+        Pydanticの設定クラス。
+        """
+
+        env_file = ".env"
+        case_sensitive = False
+
+
+# Global settings instance
+settings = Settings()
