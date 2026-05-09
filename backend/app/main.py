@@ -60,31 +60,6 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
-async def add_request_id(request: Request, call_next):
-    """HTTPリクエストに一意のリクエストIDを付与するミドルウェア
-
-    各リクエストに対してUUIDを生成し、レスポンスヘッダーに
-    X-Request-IDとして追加する。これによりログの追跡と
-    デバッグが容易になる。
-
-    Args:
-        request (Request): FastAPIのリクエストオブジェクト
-        call_next (Callable): 次のミドルウェアまたはエンドポイントを呼び出す関数
-
-    Returns:
-        Response: リクエストIDが追加されたレスポンスオブジェクト
-    """
-    import uuid
-
-    request_id = str(uuid.uuid4())
-
-    response = await call_next(request)
-    print(f"request_id: {request_id}", flush=True)
-    response.headers["X-Request-ID"] = request_id
-    return response
-
-
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -156,4 +131,11 @@ async def root():
     return {
         "message": "Welcome to Polimoney API",
         "health": "/health",
+    }
+
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "ok",
     }
