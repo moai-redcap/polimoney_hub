@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.routers import election_funds, health, political_funds
+from app.routers import election_funds, health, polimoney, political_funds
 
 # Configure logging
 logging.basicConfig(
@@ -136,6 +136,13 @@ app.include_router(
     election_funds.router,
     prefix="/api/v1",
     tags=["election-funds"],
+)
+
+# Polimoney向け公開データAPI
+app.include_router(
+    polimoney.router,
+    prefix="/api/v1",
+    tags=["polimoney"],
 )
 
 
