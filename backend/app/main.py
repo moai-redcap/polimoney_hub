@@ -1,12 +1,13 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.routers import election_funds, health, polimoney, political_funds
+from app.utils.polimoney_response import MultipleCandidatesException
 
 # Configure logging
 logging.basicConfig(
@@ -83,6 +84,26 @@ async def add_request_id(request: Request, call_next):
     print(f"request_id: {request_id}", flush=True)
     response.headers["X-Request-ID"] = request_id
     return response
+
+
+@app.exception_handler(MultipleCandidatesException)
+async def multiple_candidates_exception_handler(
+    request: Request,
+    exc: MultipleCandidatesException,
+):
+    """複数候補者エラーを400レスポンスとして返却する
+
+    Args:
+        request: リクエスト
+        exc: 複数候補者例外
+
+    Returns:
+        JSONResponse: 候補者一覧を含むエラーレスポンス
+    """
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content=exc.error.model_dump(mode="json"),
+    )
 
 
 # Global exception handler
