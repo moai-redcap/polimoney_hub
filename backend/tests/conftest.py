@@ -1,8 +1,4 @@
 import pytest
-
-# from app.database import Base
-from app.config import Settings
-from app.main import app
 from fastapi.testclient import TestClient
 
 # TODO: Supabase用のテスト設定を実装する
@@ -11,6 +7,10 @@ from fastapi.testclient import TestClient
 # from sqlalchemy.pool import StaticPool
 from httpx import AsyncClient
 from pytest_asyncio import fixture as async_fixture
+
+# from app.database import Base
+from app.config import Settings
+from app.main import app
 
 
 @pytest.fixture(scope="session")
@@ -79,8 +79,11 @@ def client():
 @async_fixture
 async def async_client():
     """Asynchronous test client using httpx"""
-    from fastapi import FastAPI
+    from fastapi import FastAPI, status
+    from fastapi.responses import JSONResponse
     from httpx import ASGITransport
+
+    from app.utils.polimoney_response import MultipleCandidatesException
 
     # Create test app without lifespan to avoid database initialization conflicts
     test_app = FastAPI(
@@ -89,9 +92,16 @@ async def async_client():
         version="1.0.0",
     )
 
+    @test_app.exception_handler(MultipleCandidatesException)
+    async def multiple_candidates_exception_handler(request, exc):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=exc.error.model_dump(mode="json"),
+        )
+
     # Include routers (same as main app)
     # TODO: Supabase用の認証機能を実装する
-    from app.routers import election_funds, health, political_funds
+    from app.routers import election_funds, health, polimoney, political_funds
     # from app.routers import auth, users, profile
 
     test_app.include_router(health.router, prefix="/api/v1", tags=["health"])
@@ -104,6 +114,7 @@ async def async_client():
     test_app.include_router(
         election_funds.router, prefix="/api/v1", tags=["election-funds"]
     )
+    test_app.include_router(polimoney.router, prefix="/api/v1", tags=["polimoney"])
 
     async with AsyncClient(
         transport=ASGITransport(app=test_app), base_url="http://testserver"

@@ -1,13 +1,13 @@
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.routers import election_funds, health, political_funds
+from app.routers import election_funds, health, polimoney, political_funds
+from app.utils.polimoney_response import MultipleCandidatesException
 
 # Configure logging
 logging.basicConfig(
@@ -59,6 +59,51 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    """HTTPリクエストに一意のリクエストIDを付与するミドルウェア
+
+    各リクエストに対してUUIDを生成し、レスポンスヘッダーに
+    X-Request-IDとして追加する。これによりログの追跡と
+    デバッグが容易になる。
+
+    Args:
+        request (Request): FastAPIのリクエストオブジェクト
+        call_next (Callable): 次のミドルウェアまたはエンドポイントを呼び出す関数
+
+    Returns:
+        Response: リクエストIDが追加されたレスポンスオブジェクト
+    """
+    import uuid
+
+    request_id = str(uuid.uuid4())
+
+    response = await call_next(request)
+    print(f"request_id: {request_id}", flush=True)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
+@app.exception_handler(MultipleCandidatesException)
+async def multiple_candidates_exception_handler(
+    request: Request,
+    exc: MultipleCandidatesException,
+):
+    """複数候補者エラーを400レスポンスとして返却する
+
+    Args:
+        request: リクエスト
+        exc: 複数候補者例外
+
+    Returns:
+        JSONResponse: 候補者一覧を含むエラーレスポンス
+    """
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content=exc.error.model_dump(mode="json"),
+    )
 
 
 # Global exception handler
@@ -114,6 +159,13 @@ app.include_router(
     tags=["election-funds"],
 )
 
+# Polimoney向け公開データAPI
+app.include_router(
+    polimoney.router,
+    prefix="/api/v1",
+    tags=["polimoney"],
+)
+
 
 @app.get("/")
 async def root():
@@ -132,12 +184,4 @@ async def root():
     return {
         "message": "Welcome to Polimoney API",
         "health": "/health",
-    }
-
-
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "ok",
-        "timestamp": datetime.now().isoformat(),
     }
