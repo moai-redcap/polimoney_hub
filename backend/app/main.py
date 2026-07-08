@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.routers import election_funds, health, polimoney, political_funds
+from app.routers import election_funds, health, polimoney, political_funds, sync
 from app.utils.polimoney_response import MultipleCandidatesException
 
 # Configure logging
@@ -164,6 +164,13 @@ app.include_router(
     polimoney.router,
     prefix="/api/v1",
     tags=["polimoney"],
+)
+
+# 同期API（Ledger → Hub）
+app.include_router(
+    sync.router,
+    prefix="/api/v1",
+    tags=["sync"],
 )
 
 
