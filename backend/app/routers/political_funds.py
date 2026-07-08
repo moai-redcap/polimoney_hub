@@ -48,7 +48,7 @@ async def get_political_funds_by_ledger_id(
         .select("*")
         .eq("id", str(ledger_id))
         .eq("ledger_type", "political_fund")
-        .single()
+        .maybe_single()
         .execute()
     )
 
@@ -71,7 +71,7 @@ async def get_political_funds_by_ledger_id(
             """
         )
         .eq("id", str(ledger.politician_organization_id))
-        .single()
+        .maybe_single()
         .execute()
     )
 

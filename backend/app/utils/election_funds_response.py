@@ -178,7 +178,7 @@ def build_election_funds_response_for_ledger(
             """
         )
         .eq("id", str(ledger.politician_election_id))
-        .single()
+        .maybe_single()
         .execute()
     )
 

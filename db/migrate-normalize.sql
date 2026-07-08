@@ -52,7 +52,9 @@ CREATE TABLE IF NOT EXISTS public_contacts (
     privacy_reason_other TEXT,
     hub_organization_id UUID REFERENCES organizations(id),
     synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    -- ledger スコープでのユニーク制約
+    UNIQUE (ledger_id, id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_public_contacts_ledger ON public_contacts(ledger_id);
@@ -109,23 +111,31 @@ UPDATE public_ledgers pl SET
         WHEN pl.election_id IS NOT NULL THEN 'election_fund'
         ELSE 'political_fund'
     END,
-    politician_organization_id = (
-        SELECT po.id FROM politician_organizations po
-        WHERE po.politician_id = pl.politician_id
-          AND po.organization_id = pl.organization_id
-    ),
-    politician_election_id = (
-        SELECT pe.id FROM politician_elections pe
-        WHERE pe.politician_id = pl.politician_id
-          AND pe.election_id = pl.election_id
-    );
-
--- ============================================
--- Step 5: public_journals に contact_id カラム追加
--- ============================================
+    politician_organization_id = CASE
+        WHEN pl.election_id IS NULL THEN (
+            SELECT po.id FROM politician_organizations po
+            WHERE po.politician_id = pl.politician_id
+              AND po.organization_id = pl.organization_id
+        )
+        ELSE NULL
+    END,
+    politician_election_id = CASE
+        WHEN pl.election_id IS NOT NULL THEN (
+            SELECT pe.id FROM politician_elections pe
+            WHERE pe.politician_id = pl.politician_id
+              AND pe.election_id = pl.election_id
+        )
+        ELSE NULL
+    END;
 
 ALTER TABLE public_journals ADD COLUMN IF NOT EXISTS contact_id UUID REFERENCES public_contacts(id);
 CREATE INDEX IF NOT EXISTS idx_public_journals_contact ON public_journals(contact_id);
+
+-- public_journals に ledger スコープの複合 FK を追加
+ALTER TABLE public_journals
+    ADD CONSTRAINT fk_public_journals_contact_ledger
+    FOREIGN KEY (ledger_id, contact_id)
+    REFERENCES public_contacts(ledger_id, id);
 
 -- ============================================
 -- Step 6: public_contacts に FK 追加（public_ledgers 変更後）
@@ -136,7 +146,35 @@ ALTER TABLE public_contacts
     FOREIGN KEY (ledger_id) REFERENCES public_ledgers(id);
 
 -- ============================================
--- Step 7: 旧カラム削除
+-- Step 7: contact_id バックフィル（既存データを新スキーマへ移行）
+-- ============================================
+
+-- public_journals の contact_name/contact_type を使って public_contacts を作成
+-- （既存データがある場合のみ。contact_name が NULL のレコードはスキップ）
+INSERT INTO public_contacts (ledger_id, contact_source_id, contact_type, name, synced_at)
+SELECT DISTINCT pj.ledger_id,
+    gen_random_uuid(),  -- 旧データにはソースIDがないため仮UUID生成
+    COALESCE(pj.contact_type, 'person'),
+    pj.contact_name,
+    NOW()
+FROM public_journals pj
+WHERE pj.contact_name IS NOT NULL
+  AND pj.contact_id IS NULL
+ON CONFLICT DO NOTHING;
+
+-- public_journals.contact_id を名前マッチングで更新
+UPDATE public_journals pj SET
+    contact_id = (
+        SELECT pc.id FROM public_contacts pc
+        WHERE pc.ledger_id = pj.ledger_id
+          AND pc.name = pj.contact_name
+        LIMIT 1
+    )
+WHERE pj.contact_name IS NOT NULL
+  AND pj.contact_id IS NULL;
+
+-- ============================================
+-- Step 8: 旧カラム削除（バックフィル完了後）
 -- ============================================
 
 -- public_ledgers から旧カラム削除
@@ -148,7 +186,7 @@ ALTER TABLE public_ledgers DROP COLUMN IF EXISTS politician_id;
 ALTER TABLE public_ledgers DROP COLUMN IF EXISTS organization_id;
 ALTER TABLE public_ledgers DROP COLUMN IF EXISTS election_id;
 
--- public_journals から旧カラム削除
+-- public_journals から旧カラム削除（バックフィル完了後のため安全）
 ALTER TABLE public_journals DROP COLUMN IF EXISTS contact_name;
 ALTER TABLE public_journals DROP COLUMN IF EXISTS contact_type;
 
@@ -156,7 +194,7 @@ ALTER TABLE public_journals DROP COLUMN IF EXISTS contact_type;
 ALTER TABLE organizations DROP COLUMN IF EXISTS politician_id;
 
 -- ============================================
--- Step 8: NOT NULL 制約・CHECK 制約追加
+-- Step 9: NOT NULL 制約・CHECK 制約追加
 -- ============================================
 
 ALTER TABLE public_ledgers ALTER COLUMN ledger_type SET NOT NULL;

@@ -222,7 +222,9 @@ CREATE TABLE IF NOT EXISTS public_contacts (
     -- Hub の政治団体への参照（political_organization タイプの場合）
     hub_organization_id UUID REFERENCES organizations(id),
     synced_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    -- ledger スコープでのユニーク制約（複合FK用）
+    UNIQUE (ledger_id, id)
 );
 
 -- 公開用仕訳（contact_name/contact_type を廃止、contact_id で参照）
@@ -242,7 +244,9 @@ CREATE TABLE IF NOT EXISTS public_journals (
     content_hash VARCHAR(64) NOT NULL,
     is_test BOOLEAN DEFAULT FALSE,
     synced_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    -- ledger スコープで contact を参照（他の ledger の contact を参照できない）
+    FOREIGN KEY (ledger_id, contact_id) REFERENCES public_contacts(ledger_id, id)
 );
 
 -- 変更ログ（変更なし）
@@ -416,9 +420,14 @@ CREATE POLICY "Allow public read" ON public_ledgers FOR SELECT USING (true);
 CREATE POLICY "Allow public read" ON public_contacts FOR SELECT USING (true);
 CREATE POLICY "Allow public read" ON public_journals FOR SELECT USING (true);
 CREATE POLICY "Allow public read" ON ledger_change_logs FOR SELECT USING (true);
-CREATE POLICY "Allow public read" ON election_requests FOR SELECT USING (true);
-CREATE POLICY "Allow public read" ON organization_requests FOR SELECT USING (true);
-CREATE POLICY "Allow public read" ON unlock_requests FOR SELECT USING (true);
+
+-- 申請テーブル: 認証済みかつ申請本人のみ閲覧可能（PII保護）
+CREATE POLICY "Allow own read" ON election_requests FOR SELECT
+    USING (auth.uid() = requested_by_politician_id);
+CREATE POLICY "Allow own read" ON organization_requests FOR SELECT
+    USING (auth.uid() = requested_by_politician_id);
+CREATE POLICY "Allow own read" ON unlock_requests FOR SELECT
+    USING (auth.uid() = requested_by_user_id);
 
 -- 管理者は自分のデータのみ読める
 CREATE POLICY "Admin users can read own data" ON admin_users FOR SELECT USING (auth.uid() = id);

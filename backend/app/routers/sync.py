@@ -4,16 +4,22 @@ Ledger から Hub への公開データ同期を受け付ける。
 contacts → journals → ledger の順に同期する。
 """
 
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from supabase import Client
 
 from app.database.supabase import get_admin_supabase_client_dep
 
 router = APIRouter()
+
+
+def _utc_now() -> str:
+    """現在の UTC タイムスタンプを ISO 8601 文字列で返す"""
+    return datetime.now(timezone.utc).isoformat()
 
 
 # ============================================
@@ -51,10 +57,18 @@ class SyncContactResult(BaseModel):
     action: str  # "created" | "updated" | "skipped"
 
 
+class SyncContactError(BaseModel):
+    """同期エラー"""
+
+    contact_source_id: str
+    error: str
+
+
 class SyncContactsResponse(BaseModel):
     """contacts 同期レスポンス"""
 
     data: list[SyncContactResult]
+    errors: list[SyncContactError] = []
 
 
 @router.post(
@@ -78,6 +92,7 @@ async def sync_contacts(
         SyncContactsResponse: 同期結果（Hub 側の contact_id を含む）
     """
     results: list[SyncContactResult] = []
+    errors: list[SyncContactError] = []
 
     for contact in contacts:
         try:
@@ -110,7 +125,7 @@ async def sync_contacts(
                 "privacy_reason_type": contact.privacy_reason_type,
                 "privacy_reason_other": contact.privacy_reason_other,
                 "hub_organization_id": contact.hub_organization_id,
-                "synced_at": "now()",
+                "synced_at": _utc_now(),
             }
 
             if existing and existing.data:
@@ -147,10 +162,15 @@ async def sync_contacts(
 
         except Exception as e:
             print(f"[Sync] Error syncing contact {contact.contact_source_id}: {e}")
-            # エラーでもスキップして続行
+            errors.append(
+                SyncContactError(
+                    contact_source_id=contact.contact_source_id,
+                    error=str(e),
+                )
+            )
             continue
 
-    return SyncContactsResponse(data=results)
+    return SyncContactsResponse(data=results, errors=errors)
 
 
 # ============================================
@@ -224,9 +244,26 @@ async def sync_journals(
                 .execute()
             )
 
+            # ledger_source_id から Hub 側の public_ledgers.id を解決
+            hub_ledger = (
+                supabase.table("public_ledgers")
+                .select("id")
+                .eq("ledger_source_id", journal.ledger_source_id)
+                .maybe_single()
+                .execute()
+            )
+            if not hub_ledger or not hub_ledger.data:
+                print(
+                    f"[Sync] Hub ledger not found for source_id {journal.ledger_source_id}"
+                )
+                result.errors += 1
+                continue
+
+            hub_ledger_id = hub_ledger.data["id"]
+
             record = {
                 "journal_source_id": journal.journal_source_id,
-                "ledger_id": journal.ledger_source_id,
+                "ledger_id": hub_ledger_id,
                 "date": journal.date,
                 "description": journal.description,
                 "amount": journal.amount,
@@ -238,7 +275,7 @@ async def sync_journals(
                 "public_expense_amount": journal.public_expense_amount,
                 "content_hash": journal.content_hash,
                 "is_test": journal.is_test,
-                "synced_at": "now()",
+                "synced_at": _utc_now(),
             }
 
             if existing and existing.data:
@@ -275,7 +312,7 @@ class SyncLedgerInput(BaseModel):
     """Ledger から同期する台帳データ"""
 
     ledger_source_id: str
-    ledger_type: str
+    ledger_type: Literal["political_fund", "election_fund"]
     politician_organization_id: Optional[str] = None
     politician_election_id: Optional[str] = None
     fiscal_year: int
@@ -283,6 +320,18 @@ class SyncLedgerInput(BaseModel):
     total_expense: int
     journal_count: int
     is_test: bool = False
+
+    @model_validator(mode="after")
+    def validate_ledger_references(self) -> "SyncLedgerInput":
+        if self.ledger_type == "political_fund" and not self.politician_organization_id:
+            raise ValueError(
+                "politician_organization_id は political_fund に必須です"
+            )
+        if self.ledger_type == "election_fund" and not self.politician_election_id:
+            raise ValueError(
+                "politician_election_id は election_fund に必須です"
+            )
+        return self
 
 
 class SyncLedgerRequest(BaseModel):
@@ -330,7 +379,7 @@ async def sync_ledger(
         "total_expense": ledger.total_expense,
         "journal_count": ledger.journal_count,
         "is_test": ledger.is_test,
-        "last_updated_at": "now()",
+        "last_updated_at": _utc_now(),
     }
 
     if existing and existing.data:
@@ -344,7 +393,7 @@ async def sync_ledger(
         }
     else:
         # 新規作成
-        record["first_synced_at"] = "now()"
+        record["first_synced_at"] = _utc_now()
         insert_result = (
             supabase.table("public_ledgers")
             .insert(record)
@@ -430,5 +479,9 @@ async def record_change_log(
         ).execute()
     except Exception as e:
         print(f"[Sync] Error recording change log: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"変更ログの記録に失敗しました: {e}",
+        )
 
     return {"status": "ok"}
