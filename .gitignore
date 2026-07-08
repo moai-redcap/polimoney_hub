@@ -6,6 +6,9 @@
 backup.sql
 *.dump
 
+# Supabase CLI (ローカル設定)
+supabase/.temp/
+
 # Deno
 .deno/
 
